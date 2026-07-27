@@ -1,11 +1,16 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   AlertTriangle, ArrowDown, ArrowLeft, ArrowUp, CalendarDays, Check, ChevronDown,
   ChevronRight, Clipboard, Clock3, Copy, ExternalLink, FileMusic, FileText, Home,
-  KeyRound, Library, Link2, LockKeyhole, Menu, Mic2, MoreHorizontal, Music2,
+  KeyRound, Library, Link2, LockKeyhole, LogOut, Menu, Mic2, Music2,
   PauseCircle, Plus, Printer, RefreshCw, Save, Settings, Share2, ShieldAlert,
-  Sparkles, Square, Trash2, UserRound, Users, X, Zap
+  Sparkles, Square, Trash2, UserRound, X, Zap
 } from 'lucide-react';
+import { useAuth } from './auth/AuthProvider';
+import ProtectedRoute, { AuthStatusScreen } from './auth/ProtectedRoute';
+import LoginPage from './pages/LoginPage';
+import SignUpPage from './pages/SignUpPage';
+import { getAuthErrorMessage } from './services/authService';
 import { loadStore, resetStore, saveStore } from './storage/localStore';
 
 const cueLabels = { mc: 'MC', se: 'SE', changeover: '転換', costume: '衣装チェンジ', blackout: '暗転', break: '休憩', other: 'その他' };
@@ -24,20 +29,77 @@ const effectiveVersion = (entry, versions) => {
 };
 
 export default function App() {
+  const {
+    user: authUser,
+    loading: authLoading,
+    initializationError,
+    signOut,
+  } = useAuth();
   const [data, setData] = useState(loadStore);
   const [path, setPath] = useState(window.location.pathname);
   const [view, setView] = useState('home');
   const [activeLiveId, setActiveLiveId] = useState(null);
   const [menuOpen, setMenuOpen] = useState(false);
-  const user = data.users.find(u => u.id === data.currentUserId);
+  const [signingOut, setSigningOut] = useState(false);
+  const [logoutError, setLogoutError] = useState('');
+  const prototypeUser = data.users.find(u => u.id === data.currentUserId) || data.users[0];
   const update = (fn) => setData(current => fn(structuredClone(current)));
 
   useEffect(() => saveStore(data), [data]);
   useEffect(() => { const onPop = () => setPath(window.location.pathname); window.addEventListener('popstate', onPop); return () => window.removeEventListener('popstate', onPop); }, []);
-  const go = (next) => { history.pushState({}, '', next); setPath(next); };
+  const go = useCallback((next, options = {}) => {
+    const method = options.replace ? 'replaceState' : 'pushState';
+    window.history[method](options.state ?? {}, '', next);
+    setPath(next);
+  }, []);
+  const onAuthenticated = useCallback(() => {
+    const requestedPath = window.history.state?.from;
+    const nextPath = requestedPath
+      && requestedPath.startsWith('/')
+      && !['/login', '/signup'].includes(requestedPath)
+      ? requestedPath
+      : '/';
+    go(nextPath, { replace: true });
+  }, [go]);
+  const handleLogout = async () => {
+    setLogoutError('');
+    setSigningOut(true);
+    try {
+      await signOut();
+      go('/login', { replace: true });
+    } catch (error) {
+      setLogoutError(getAuthErrorMessage(error));
+    } finally {
+      setSigningOut(false);
+    }
+  };
+  const authDisplayName = authUser?.user_metadata?.display_name?.trim()
+    || authUser?.email?.split('@')[0]
+    || 'ユーザー';
 
   if (path.startsWith('/share/')) return <SharedPage data={data} token={decodeURIComponent(path.split('/')[2] || '')} goHome={() => go('/')} />;
-  if (!user) return <Login users={data.users} onLogin={(id) => update(d => ({ ...d, currentUserId: id }))} onShared={() => setPath('/share-help')} />;
+  if (authLoading && ['/login', '/signup'].includes(path)) return <AuthStatusScreen />;
+  if (authUser && ['/login', '/signup'].includes(path)) {
+    return <RouteRedirect navigate={go} to="/" />;
+  }
+  if (path === '/login') {
+    return (
+      <LoginPage
+        initializationError={initializationError}
+        onAuthenticated={onAuthenticated}
+        onNavigate={go}
+      />
+    );
+  }
+  if (path === '/signup') {
+    return (
+      <SignUpPage
+        initializationError={initializationError}
+        onAuthenticated={onAuthenticated}
+        onNavigate={go}
+      />
+    );
+  }
   const activeLive = data.lives.find(l => l.id === activeLiveId) || data.lives[0];
   const openLive = (id) => { setActiveLiveId(id); setView('setlist'); setMenuOpen(false); };
   const createLive = (source) => {
@@ -60,7 +122,7 @@ export default function App() {
     ['share', '共有', Share2], ['print', '印刷', Printer]
   ];
 
-  return <div className="app-shell">
+  return <ProtectedRoute currentPath={path} navigate={go}><div className="app-shell">
     <aside className={`sidebar ${menuOpen ? 'open' : ''}`}>
       <div className="brand"><span><Zap size={18}/></span><div><b>Live Pack</b><small>SETLIST WORKSPACE</small></div></div>
       <button className="mobile-close icon" onClick={() => setMenuOpen(false)}><X/></button>
@@ -73,31 +135,46 @@ export default function App() {
       <div className="side-bottom">
         <button onClick={() => setView('prepare')}><UserRound/>自分の準備</button>
         <button onClick={() => setView('settings')}><Settings/>設定</button>
-        <small>フロントエンド・モック</small>
+        <small>AUTH: SUPABASE / DATA: LOCAL</small>
       </div>
     </aside>
     <main>
       <header className="topbar">
         <button className="menu-button icon" onClick={() => setMenuOpen(true)}><Menu/></button>
         <div><span className="top-label">LIVE PACK v2</span><b>{activeLive && ['setlist','share','print','prepare'].includes(view) ? activeLive.title : nav.find(n => n[0] === view)?.[1] || '設定'}</b></div>
-        <div className="account"><span className="avatar">{user.name[0]}</span><select value={user.id} onChange={e => update(d => ({ ...d, currentUserId: e.target.value }))}>{data.users.map(u => <option key={u.id} value={u.id}>{u.name}として確認</option>)}</select></div>
+        <div className="account">
+          <span className="avatar">{authDisplayName[0]}</span>
+          <span className="account-details">
+            <b>{authDisplayName}</b>
+            <small>{authUser?.email}</small>
+          </span>
+          <button
+            className="icon logout-button"
+            disabled={signingOut}
+            onClick={handleLogout}
+            title={signingOut ? 'ログアウト中' : 'ログアウト'}
+          >
+            <LogOut />
+          </button>
+          {logoutError && <span className="account-error" role="alert">{logoutError}</span>}
+        </div>
       </header>
       {view === 'home' && <HomePage data={data} createLive={createLive} openLive={openLive} go={setView}/>} 
       {view === 'songs' && <SongLibrary data={data} update={update}/>} 
       {view === 'setlist' && <SetlistPage data={data} live={activeLive} update={update} createLive={createLive}/>} 
       {view === 'share' && <SharePage data={data} live={activeLive} update={update} go={go}/>} 
       {view === 'print' && <PrintPage data={data} live={activeLive}/>} 
-      {view === 'prepare' && <PreparePage data={data} live={activeLive} user={user} update={update}/>} 
-      {view === 'settings' && <SettingsPage data={data} update={update} logout={() => update(d => ({ ...d, currentUserId: null }))}/>} 
+      {view === 'prepare' && <PreparePage data={data} live={activeLive} user={prototypeUser} update={update}/>}
+      {view === 'settings' && <SettingsPage authDisplayName={authDisplayName} authUser={authUser} data={data} logout={handleLogout} logoutError={logoutError} signingOut={signingOut} update={update}/>}
     </main>
-  </div>;
+  </div></ProtectedRoute>;
 }
 
-function Login({ users, onLogin, onShared }) {
-  return <div className="login-page">
-    <section className="login-copy"><div className="brand large"><span><Zap/></span><div><b>Live Pack</b><small>SETLIST WORKSPACE</small></div></div><p className="kicker">曲を並べる。曲間を決める。必要な人へ渡す。</p><h1>ライブの準備を、<br/><em>ひとつのセトリ</em>から。</h1><p>LINE、スプレッドシート、Driveに散らばっていた情報を、本番の流れに沿ってまとめるローカルプロトタイプです。</p><div className="login-notice"><ShieldAlert/><span>実ログインや外部共有はまだありません。保存先はこのブラウザです。</span></div></section>
-    <section className="login-card"><span className="step-label">確認モードを選ぶ</span><h2>どの立場で見ますか？</h2><p>あとから画面右上で切り替えられます。</p><div className="login-options"><button className="host-option" onClick={() => onLogin('host')}><span><Users/></span><div><b>ホストとして入る</b><small>セトリを作成・編集・共有する</small></div><ChevronRight/></button><button onClick={() => onLogin('support')}><span><UserRound/></span><div><b>メンバーとして確認する</b><small>自分向けメモと準備を確認する</small></div><ChevronRight/></button><button onClick={onShared}><span><Link2/></span><div><b>共有リンクで見る</b><small>発行済みURLからログインなしで閲覧</small></div><ChevronRight/></button></div><small className="generic-roles">汎用ロール：{users.map(u => u.name).join('・')}</small></section>
-  </div>;
+function RouteRedirect({ navigate, to }) {
+  useEffect(() => {
+    navigate(to, { replace: true });
+  }, [navigate, to]);
+  return <AuthStatusScreen title="アプリを開いています" text="少々お待ちください。" />;
 }
 
 function PageHead({ eyebrow, title, text, children }) { return <div className="page-head"><div><span className="eyebrow">{eyebrow}</span><h1>{title}</h1>{text && <p>{text}</p>}</div>{children && <div className="head-actions">{children}</div>}</div>; }
@@ -174,5 +251,25 @@ function PrintPage({data,live}) { const [type,setType]=useState('all'); if(!live
 function PrintSheet({data,live,type}) { const entries=data.setlistEntries.filter(e=>e.liveId===live.id).sort((a,b)=>a.order-b.order);const cues=data.setlistCues.filter(c=>c.liveId===live.id);return <article className="paper"><header><small>LIVE PACK / {type==='staff'?'スタッフ用':type==='support'?'サポート演者用':type==='public'?'公開用':'全員用'}</small><h1>{live.title}</h1><p>{live.date||'日付未定'}　{live.venue||'会場未定'}　持ち時間 {formatTime(live.timeLimitSec)}</p></header><div className="paper-list">{entries.map((e,i)=>{const song=data.songs.find(s=>s.id===e.songId),info=effectiveVersion(e,data.songVersions);return <div key={e.id}><section className="paper-song"><b>{i+1}</b><div><h2>{song?.title}</h2>{type!=='public'&&<p>{formatTime(info.durationSec)}　{type!=='staff'&&<>Key {info.key||'—'}　BPM {info.bpm||'—'}　</>}同期 {info.hasSync?'あり':'なし'}　Click {info.hasClick?'あり':'なし'}</p>}{e.memo&&<small>{e.memo}</small>}{type==='support'&&e.roleNote&&<small>あなた向け：{e.roleNote}</small>}{type==='staff'&&e.staffNote&&<small>スタッフ：{e.staffNote}</small>}</div></section>{type!=='public'&&cues.filter(c=>c.afterEntryId===e.id).map(c=><section className="paper-cue" key={c.id}><span>↓ {cueLabels[c.type]}</span><b>{[c.cueType,c.triggerPerson&&`${c.triggerPerson}合図`,c.operator&&`${c.operator}操作`,c.playback].filter(Boolean).join(' / ')}</b><time>{formatTime(c.durationSec)}</time></section>)}</div>})}</div></article> }
 
 function PreparePage({data,live,user,update}) { if(!live)return <div className="page"><Empty title="確認するセトリがありません" text="先にセトリを作成してください。"/></div>;const entries=data.setlistEntries.filter(e=>e.liveId===live.id).sort((a,b)=>a.order-b.order);return <div className="page"><PageHead eyebrow="自分の準備" title={`${user.roleName}として確認`} text="個人練習メモと担当別メモは、メインのセトリから分けています。"/>{!entries.length?<Empty title="準備する曲がありません" text="セトリに曲を追加すると、ここに自分向け情報が並びます。"/>:<div className="prepare-list">{entries.map((e,i)=>{const song=data.songs.find(s=>s.id===e.songId);return <article key={e.id}><b>{i+1}</b><div><h3>{song?.title}</h3>{e.roleNote&&<p><span>担当別</span>{e.roleNote}</p>}<label>自分だけの練習メモ<textarea value={e.privateNote||''} onChange={x=>update(d=>{d.setlistEntries.find(a=>a.id===e.id).privateNote=x.target.value;return d})} placeholder="不安な箇所や個人練習のメモ"/></label></div></article>})}</div>}</div> }
-function SettingsPage({data,update,logout}) { const [adding,setAdding]=useState(false); const reset=()=>{if(confirm('v2のローカルデータをすべて削除しますか？')){const next=resetStore();update(()=>next)}};return <div className="page"><PageHead eyebrow="設定" title="担当とローカルデータ" text="担当名は楽器に限定せず、自由に追加できます。"/><section className="settings-card"><div className="section-head"><div><h2>メンバー / 担当</h2><p>共有範囲や担当別メモの宛先として使います。</p></div><button className="secondary" onClick={()=>setAdding(true)}><Plus/>担当を追加</button></div><div className="member-rows">{data.users.map(u=><div key={u.id}><span className="avatar">{u.name[0]}</span><b>{u.name}</b><span>{u.roleName}</span><small>{u.category}</small></div>)}</div></section><section className="settings-card subdued"><h2>このブラウザのデータ</h2><p>保存キー：live-pack-prototype-v2。v1データは読み込まず、別に保持します。</p><div><button className="secondary" onClick={logout}>ログイン画面へ戻る</button><button className="text-danger" onClick={reset}><RefreshCw/>すべてリセット</button></div></section>{adding&&<MemberModal close={()=>setAdding(false)} update={update}/>}</div> }
+function SettingsPage({authDisplayName,authUser,data,update,logout,logoutError,signingOut}) {
+  const [adding,setAdding]=useState(false);
+  const reset=()=>{if(confirm('v2のローカルデータをすべて削除しますか？')){const next=resetStore();update(()=>next)}};
+  return <div className="page">
+    <PageHead eyebrow="設定" title="アカウントとローカルデータ" text="認証アカウントと、現在のローカル保存データを確認できます。"/>
+    <section className="settings-card auth-account-card">
+      <div>
+        <span className="avatar">{authDisplayName[0]}</span>
+        <span><small>ログイン中</small><b>{authDisplayName}</b><em>{authUser?.email}</em></span>
+      </div>
+      <button className="secondary" disabled={signingOut} onClick={logout}><LogOut/>{signingOut?'ログアウト中…':'ログアウト'}</button>
+      {logoutError&&<p className="settings-auth-error" role="alert">{logoutError}</p>}
+    </section>
+    <section className="settings-card">
+      <div className="section-head"><div><h2>ローカルのメンバー / 担当</h2><p>共有モックや担当別メモで使うプレビュー用データです。Supabase Authのユーザーとは別です。</p></div><button className="secondary" onClick={()=>setAdding(true)}><Plus/>担当を追加</button></div>
+      <div className="member-rows">{data.users.map(u=><div key={u.id}><span className="avatar">{u.name[0]}</span><b>{u.name}</b><span>{u.roleName}</span><small>{u.category}</small></div>)}</div>
+    </section>
+    <section className="settings-card subdued"><h2>このブラウザのデータ</h2><p>保存キー：live-pack-prototype-v2。曲・セトリ・共有モックは、まだSupabaseへ移行していません。</p><div><span/><button className="text-danger" onClick={reset}><RefreshCw/>すべてリセット</button></div></section>
+    {adding&&<MemberModal close={()=>setAdding(false)} update={update}/>}
+  </div>
+}
 function MemberModal({close,update}) { const categories=['ボーカル','ギター/ベース','ドラム/パーカッション','鍵盤','管楽器','弦楽器','DJ/MPC/電子楽器','同期/PC','スタッフ','その他'];const [form,setForm]=useState({name:'',roleName:'',category:'その他'});const save=e=>{e.preventDefault();update(d=>{d.users.push({id:uid('member'),name:form.name,role:'member',roleName:form.roleName||form.name,category:form.category});return d});close()};return <Modal title="担当を追加" subtitle="自由な担当名に対応" close={close}><form className="form" onSubmit={save}><label>表示名<input required value={form.name} onChange={e=>setForm({...form,name:e.target.value})} placeholder="例：サポートフルート"/></label><label>カテゴリ<select value={form.category} onChange={e=>setForm({...form,category:e.target.value})}>{categories.map(c=><option key={c}>{c}</option>)}</select></label><label>担当名（自由入力）<input value={form.roleName} onChange={e=>setForm({...form,roleName:e.target.value})} placeholder="例：MPC / 同期担当"/></label><footer><button type="button" className="secondary" onClick={close}>キャンセル</button><button className="primary">追加する</button></footer></form></Modal> }
