@@ -3,6 +3,7 @@ node_modules/
 
 # Build output
 dist/
+debug.log
 
 # Local environment variables
 .env

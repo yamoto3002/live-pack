@@ -46,10 +46,10 @@ export default function LoginPage({ onAuthenticated, onNavigate, initializationE
         </div>
         <p className="kicker">曲を並べる。曲間を決める。必要な人へ渡す。</p>
         <h1>ライブの準備を、<br /><em>ひとつのセトリ</em>から。</h1>
-        <p>ログインすると、このブラウザに保存されている曲やセトリを引き続き利用できます。</p>
+        <p>ログインすると、バンドの曲やセトリをSupabaseから安全に読み込めます。</p>
         <div className="login-notice">
           <ShieldAlert />
-          <span>認証はSupabase Auth、曲・セトリは現在もこのブラウザに保存されます。</span>
+          <span>認証と主要データはSupabaseで管理します。旧ブラウザデータは設定画面から一度だけ移行できます。</span>
         </div>
       </section>
       <section className="login-card">
