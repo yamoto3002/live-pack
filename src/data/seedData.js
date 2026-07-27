@@ -1,0 +1,21 @@
+export const seedData = {
+  schemaVersion: 2,
+  users: [
+    { id: 'host', name: 'ホスト', role: 'host', roleName: 'バンマス / 管理', category: 'その他' },
+    { id: 'vocal', name: 'ボーカル', role: 'member', roleName: 'ボーカル', category: 'ボーカル' },
+    { id: 'guitar', name: 'ギター', role: 'member', roleName: 'ギター', category: 'ギター/ベース' },
+    { id: 'drums', name: 'ドラム', role: 'member', roleName: 'ドラム', category: 'ドラム/パーカッション' },
+    { id: 'support', name: 'サポート', role: 'member', roleName: 'サポート', category: 'その他' },
+    { id: 'staff', name: 'スタッフ', role: 'member', roleName: 'スタッフ', category: 'スタッフ' },
+  ],
+  currentUserId: null,
+  releases: [],
+  songs: [],
+  songVersions: [],
+  lives: [],
+  setlistEntries: [],
+  setlistCues: [],
+  notes: [],
+  links: [],
+  shareLinks: [],
+};

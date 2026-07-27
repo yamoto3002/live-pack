@@ -1,0 +1,5 @@
+export function suggestSetlist(songs,{timeLimitSec=1800,audience='mixed',mood='danceable',includeNew=true,mcCount=1}){
+ const scored=songs.filter(s=>includeNew||!s.roleTags.includes('new_song')).map(s=>({s,score:(audience==='first'?s.suitableFor.firstTimeAudience:audience==='fans'?s.suitableFor.coreFans:(s.suitableFor.firstTimeAudience+s.suitableFor.coreFans)/2)+(s.moodTags.includes(mood)?4:0)+s.energy/3-s.rehearsalRisk/5})).sort((a,b)=>b.score-a.score);
+ const picked=[];let total=mcCount*60;for(const {s} of scored){if(total+s.defaultDurationSec<=timeLimitSec-45){picked.push(s);total+=s.defaultDurationSec}}
+ picked.sort((a,b)=>a.energy-b.energy);if(picked.length){const opener=picked.sort((a,b)=>b.suitableFor.opener-a.suitableFor.opener).shift();const closer=picked.sort((a,b)=>b.suitableFor.closer-a.suitableFor.closer).shift();const middle=picked.sort((a,b)=>a.energy-b.energy);return{songs:[opener,...middle,closer].filter(Boolean),total,reason:'客層・ムード適性と持ち時間を重み付けし、序盤とラストの役割を整えました。',caution:'機材変更とリハ不安度は確定前に確認してください。'}}return{songs:[],total:0,reason:'条件内で候補を作れませんでした。',caution:'持ち時間を見直してください。'}
+}
