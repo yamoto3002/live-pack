@@ -5,7 +5,7 @@ export async function listSongs(bandId) {
   return assertSupabaseResult(
     await supabase
       .from('songs')
-      .select('id, band_id, release_id, title, color, memo')
+      .select('id, band_id, release_id, title, color, color_token, memo')
       .eq('band_id', bandId)
       .order('created_at', { ascending: true }),
     '曲一覧の取得',

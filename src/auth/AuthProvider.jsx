@@ -8,6 +8,7 @@ import {
 } from 'react';
 import { supabase } from '../lib/supabase';
 import {
+  signInWithGoogle,
   signInWithPassword,
   signOutCurrentSession,
   signUpWithPassword,
@@ -65,6 +66,8 @@ export function AuthProvider({ children }) {
     setSession(null);
   }, []);
 
+  const signInGoogle = useCallback(async (returnPath) => signInWithGoogle(returnPath), []);
+
   const value = useMemo(
     () => ({
       session,
@@ -74,13 +77,16 @@ export function AuthProvider({ children }) {
       signUp,
       signIn,
       signOut,
+      signInGoogle,
     }),
-    [initializationError, loading, session, signIn, signOut, signUp],
+    [initializationError, loading, session, signIn, signInGoogle, signOut, signUp],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 
+// This hook intentionally shares the context from the provider module.
+// eslint-disable-next-line react-refresh/only-export-components
 export function useAuth() {
   const context = useContext(AuthContext);
   if (!context) {

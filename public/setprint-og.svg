@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
+  <rect width="1200" height="630" fill="#090a0b"/>
+  <path d="M0 520L1200 160V630H0Z" fill="#121713"/>
+  <path d="M80 472L1120 160" stroke="#d7ff54" stroke-width="8"/>
+  <text x="80" y="244" fill="#f2f2ed" font-family="Arial,sans-serif" font-size="112" font-weight="800" letter-spacing="-6">SETPRINT</text>
+  <text x="86" y="320" fill="#9da39a" font-family="Arial,sans-serif" font-size="34">SETLIST WORKSPACE / FROM PLAN TO STAGE</text>
+</svg>

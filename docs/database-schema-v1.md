@@ -1,8 +1,8 @@
-# Live Pack データベース設計 v1
+# SETPRINT データベース設計 v1（互換資料）
 
 ## 1. この設計の範囲
 
-この文書は、Live Pack の初期 Supabase スキーマと Row Level Security
+この文書は、SETPRINTの初期 Supabase スキーマと Row Level Security
 （RLS）の設計を説明する。対象 migration は次のファイルである。
 
 - `supabase/migrations/20260727143520_initial_live_pack_schema.sql`

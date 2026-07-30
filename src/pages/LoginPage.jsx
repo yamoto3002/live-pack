@@ -1,103 +1,102 @@
 import { useState } from 'react';
-import { LogIn, ShieldAlert, Zap } from 'lucide-react';
+import { Eye, EyeOff, KeyRound, Mail } from 'lucide-react';
 import { useAuth } from '../auth/AuthProvider';
+import { BrandMark } from '../components/BrandMark';
 import { getAuthErrorMessage } from '../services/authService';
 
-const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+function GoogleIcon() {
+  return <span className="google-mark" aria-hidden="true">G</span>;
+}
 
-export default function LoginPage({ onAuthenticated, onNavigate, initializationError }) {
-  const { signIn } = useAuth();
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState('');
+export default function LoginPage({ initializationError, onAuthenticated, onNavigate }) {
+  const { signIn, signInGoogle } = useAuth();
+  const [form, setForm] = useState({ email: '', password: '' });
+  const [visible, setVisible] = useState(false);
+  const [capsLock, setCapsLock] = useState(false);
+  const [busy, setBusy] = useState('');
+  const [error, setError] = useState(initializationError ? getAuthErrorMessage(initializationError) : '');
 
-  const handleSubmit = async (event) => {
+  const submit = async (event) => {
     event.preventDefault();
+    setBusy('email');
     setError('');
-
-    if (!email.trim() || !password) {
-      setError('メールアドレスとパスワードを入力してください。');
-      return;
-    }
-
-    if (!EMAIL_PATTERN.test(email.trim())) {
-      setError('有効なメールアドレスを入力してください。');
-      return;
-    }
-
-    setSubmitting(true);
     try {
-      await signIn({ email, password });
+      await signIn(form);
       onAuthenticated();
-    } catch (authError) {
-      setError(getAuthErrorMessage(authError));
+    } catch (cause) {
+      setError(getAuthErrorMessage(cause));
     } finally {
-      setSubmitting(false);
+      setBusy('');
+    }
+  };
+
+  const google = async () => {
+    setBusy('google');
+    setError('');
+    try {
+      await signInGoogle(window.history.state?.from || '/');
+    } catch (cause) {
+      setError(getAuthErrorMessage(cause));
+      setBusy('');
     }
   };
 
   return (
-    <div className="login-page">
-      <section className="login-copy">
-        <div className="brand large">
-          <span><Zap /></span>
-          <div><b>Live Pack</b><small>SETLIST WORKSPACE</small></div>
+    <main className="auth-page">
+      <section className="auth-visual" aria-label="SETPRINTの紹介">
+        <BrandMark light />
+        <div className="auth-visual-copy">
+          <span className="eyebrow">FROM PLAN TO STAGE</span>
+          <h1>曲順を、<br />現場の言葉へ。</h1>
+          <p>曲、キュー、担当、共有、印刷。舞台袖で迷わない一枚を、チームで仕上げます。</p>
+          <div className="stage-line" aria-hidden="true"><i /><i /><i /><i /></div>
         </div>
-        <p className="kicker">曲を並べる。曲間を決める。必要な人へ渡す。</p>
-        <h1>ライブの準備を、<br /><em>ひとつのセトリ</em>から。</h1>
-        <p>ログインすると、バンドの曲やセトリをSupabaseから安全に読み込めます。</p>
-        <div className="login-notice">
-          <ShieldAlert />
-          <span>認証と主要データはSupabaseで管理します。旧ブラウザデータは設定画面から一度だけ移行できます。</span>
-        </div>
+        <small>SETLIST WORKSPACE / 2026</small>
       </section>
-      <section className="login-card">
-        <span className="step-label">SUPABASE AUTH</span>
-        <h2>ログイン</h2>
-        <p>登録済みのメールアドレスとパスワードを入力してください。</p>
-        <form className="auth-form" noValidate onSubmit={handleSubmit}>
+      <section className="auth-panel">
+        <div className="mobile-auth-brand"><BrandMark /></div>
+        <span className="eyebrow">WELCOME BACK</span>
+        <h1>SETPRINTへログイン</h1>
+        <p>次のステージの続きを開きます。</p>
+        <button className="google-button" disabled={Boolean(busy)} onClick={google}>
+          <GoogleIcon />{busy === 'google' ? 'Googleへ移動中…' : 'Googleで続ける'}
+        </button>
+        <div className="auth-divider"><span>またはメールアドレス</span></div>
+        <form className="auth-form" onSubmit={submit}>
           <label>
             メールアドレス
-            <input
-              autoComplete="email"
-              autoFocus
-              disabled={submitting}
-              inputMode="email"
-              onChange={(event) => setEmail(event.target.value)}
-              placeholder="name@example.com"
-              required
-              type="email"
-              value={email}
-            />
+            <span><Mail /><input type="email" autoComplete="email" required value={form.email} onChange={(event) => setForm({ ...form, email: event.target.value })} placeholder="name@example.com" /></span>
           </label>
           <label>
             パスワード
-            <input
-              autoComplete="current-password"
-              disabled={submitting}
-              onChange={(event) => setPassword(event.target.value)}
-              required
-              type="password"
-              value={password}
-            />
+            <span>
+              <KeyRound />
+              <input
+                type={visible ? 'text' : 'password'}
+                autoComplete="current-password"
+                required
+                value={form.password}
+                onChange={(event) => setForm({ ...form, password: event.target.value })}
+                onKeyUp={(event) => setCapsLock(event.getModifierState('CapsLock'))}
+              />
+              <button type="button" onClick={() => setVisible(!visible)} aria-label="パスワード表示を切り替える">{visible ? <EyeOff /> : <Eye />}</button>
+            </span>
           </label>
-          {(error || initializationError) && (
-            <div className="auth-message error" role="alert">
-              <ShieldAlert />
-              <span>{error || 'ログイン状態の確認に失敗しました。もう一度ログインしてください。'}</span>
-            </div>
-          )}
-          <button className="primary auth-submit" disabled={submitting} type="submit">
-            <LogIn />
-            {submitting ? 'ログイン中…' : 'ログイン'}
+          {capsLock && <p className="caps-warning">Caps Lockがオンです。</p>}
+          {error && <p className="form-message error" role="alert">{error}</p>}
+          <div className="auth-options">
+            <button type="button" className="text-button" onClick={() => onNavigate('/forgot-password')}>パスワードを忘れた場合</button>
+          </div>
+          <button className="primary auth-submit" disabled={Boolean(busy)}>
+            {busy === 'email' ? 'ログイン中…' : 'ログイン'}
           </button>
         </form>
-        <div className="auth-card-footer">
+        <footer className="auth-footer">
           <span>アカウントをお持ちでない方</span>
-          <button type="button" onClick={() => onNavigate('/signup')}>新規登録へ</button>
-        </div>
+          <button className="text-button" onClick={() => onNavigate('/signup')}>アカウントを作成</button>
+        </footer>
+        <p className="legal-links"><a href="/terms">利用規約</a><a href="/privacy">プライバシーポリシー</a></p>
       </section>
-    </div>
+    </main>
   );
 }

@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
-import { LoaderCircle, ShieldAlert, Zap } from 'lucide-react';
+import { LoaderCircle, ShieldAlert } from 'lucide-react';
 import { useAuth } from './AuthProvider';
+import { BrandMark } from '../components/BrandMark';
 
 export function AuthStatusScreen({
   title = '認証状態を確認しています',
@@ -9,10 +10,7 @@ export function AuthStatusScreen({
 }) {
   return (
     <div className="auth-state-page">
-      <div className="brand centered">
-        <span><Zap /></span>
-        <div><b>Live Pack</b><small>SETLIST WORKSPACE</small></div>
-      </div>
+      <BrandMark light />
       <span className={`auth-state-icon ${error ? 'error' : ''}`}>
         {error ? <ShieldAlert /> : <LoaderCircle className="spin" />}
       </span>

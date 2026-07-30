@@ -1,10 +1,32 @@
 import { seedData } from '../data/seedData';
 
-export const STORAGE_KEY = 'live-pack-prototype-v2';
-export const CLIENT_STATE_KEY = 'live-pack-client-state-v1';
-export const SELECTED_BAND_KEY = 'live-pack-selected-band-id';
-const IMPORT_STATE_PREFIX = 'live-pack-import-v1:';
+export const STORAGE_KEY = 'setprint-prototype-v2';
+export const CLIENT_STATE_KEY = 'setprint-client-state-v2';
+export const SELECTED_BAND_KEY = 'setprint-selected-band-id';
+const LEGACY_STORAGE_KEY = 'live-pack-prototype-v2';
+const LEGACY_CLIENT_STATE_KEY = 'live-pack-client-state-v1';
+const LEGACY_SELECTED_BAND_KEY = 'live-pack-selected-band-id';
+const MIGRATION_FLAG = 'setprint-storage-migrated-v1';
+const IMPORT_STATE_PREFIX = 'setprint-import-v2:';
 const clone = (value) => JSON.parse(JSON.stringify(value));
+
+export function migrateLegacyStorage(storage = localStorage) {
+  if (storage.getItem(MIGRATION_FLAG)) return false;
+  [
+    [LEGACY_STORAGE_KEY, STORAGE_KEY],
+    [LEGACY_CLIENT_STATE_KEY, CLIENT_STATE_KEY],
+    [LEGACY_SELECTED_BAND_KEY, SELECTED_BAND_KEY],
+  ].forEach(([legacyKey, nextKey]) => {
+    const legacyValue = storage.getItem(legacyKey);
+    if (legacyValue !== null && storage.getItem(nextKey) === null) {
+      storage.setItem(nextKey, legacyValue);
+    }
+  });
+  storage.setItem(MIGRATION_FLAG, new Date().toISOString());
+  return true;
+}
+
+if (typeof localStorage !== 'undefined') migrateLegacyStorage();
 
 function normalize(value) {
   const base = clone(seedData);
@@ -24,7 +46,8 @@ export function loadStore() {
 }
 
 export function hasLegacyStore() {
-  return localStorage.getItem(STORAGE_KEY) !== null;
+  return localStorage.getItem(STORAGE_KEY) !== null
+    || localStorage.getItem(LEGACY_STORAGE_KEY) !== null;
 }
 
 export function saveStore(data) {
@@ -86,4 +109,5 @@ export function saveImportState(bandId, value) {
 
 export function clearLegacyStore() {
   localStorage.removeItem(STORAGE_KEY);
+  localStorage.removeItem(LEGACY_STORAGE_KEY);
 }

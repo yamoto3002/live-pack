@@ -26,6 +26,7 @@ import {
   toSongRow,
   toVersionRow,
 } from './livePackMapper';
+import { deleteTags, replaceSongTags, upsertTags } from './tagService';
 
 const comparable = (value) => JSON.stringify(value);
 
@@ -66,6 +67,7 @@ export async function syncLivePackDiff({
   const changedEntries = changed(before.setlistEntries, after.setlistEntries);
   const changedCues = changed(before.setlistCues, after.setlistCues);
   const changedLinks = changed(before.links, after.links);
+  const changedTags = changed(before.tags ?? [], after.tags ?? []);
   const previousVersionById = new Map(
     before.songVersions.map((version) => [version.id, version]),
   );
@@ -94,6 +96,7 @@ export async function syncLivePackDiff({
   await deleteSongs(deleted(before.songs, after.songs), bandId);
   await deleteReleases(deleted(before.releases, after.releases), bandId);
   await deleteLives(deleted(before.lives, after.lives), bandId);
+  await deleteTags(deleted(before.tags ?? [], after.tags ?? []));
 
   await upsertReleases(
     changedReleases.map((release) => toReleaseRow(
@@ -121,6 +124,22 @@ export async function syncLivePackDiff({
       .filter((link) => String(link.url ?? '').trim())
       .map((link) => toLinkRow(link, after, bandId)),
   );
+  await upsertTags(changedTags.map((tag) => ({
+    id: tag.id,
+    band_id: bandId,
+    name: tag.name.trim(),
+    color_token: tag.colorToken || 'graphite',
+    sort_order: tag.sortOrder ?? 0,
+  })));
+  const beforeSongTags = before.songTags ?? [];
+  const afterSongTags = after.songTags ?? [];
+  const touchedSongIds = new Set([
+    ...beforeSongTags.filter((row) => !afterSongTags.some((next) => next.songId === row.songId && next.tagId === row.tagId)).map((row) => row.songId),
+    ...afterSongTags.filter((row) => !beforeSongTags.some((previous) => previous.songId === row.songId && previous.tagId === row.tagId)).map((row) => row.songId),
+  ]);
+  for (const songId of touchedSongIds) {
+    await replaceSongTags(songId, afterSongTags.filter((row) => row.songId === songId).map((row) => row.tagId));
+  }
 
   const changedEntryIds = new Set(changedEntries.map((entry) => entry.id));
   const noteRows = after.setlistEntries

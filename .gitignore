@@ -4,6 +4,11 @@ node_modules/
 # Build output
 dist/
 debug.log
+coverage/
+playwright-report/
+test-results/
+supabase/.temp/
+.vercel/
 
 # Local environment variables
 .env

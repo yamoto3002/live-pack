@@ -1,100 +1,102 @@
-# Live Pack v2
+# SETPRINT
 
-Live Pack v2 は、ライブ準備の中心を「セットリスト」に置いた React/Vite のフロントエンド・プロトタイプです。
+SETPRINTは、バンドやアーティストが曲を蓄積し、ライブごとのセットリストを組み、出演者・スタッフ・会場へ必要な情報だけを安全に渡すWebアプリです。中心にあるのはライブ管理全般ではなく、セットリストの作成、編集、共有、印刷です。
 
-LINE、スプレッドシート、Google Drive、口頭に分散していた曲順・曲間・音源・譜面・合図・担当別メモを、本番の流れに沿って短時間でまとめ、必要な相手に必要な範囲だけ渡す体験を検証します。
+## 主な機能
 
-## v2で再設計したこと
+- メール／パスワード認証、Google OAuth、パスワード再設定
+- Supabaseを正とするバンド、曲、バージョン、ライブ、セットリスト、キュー、メモ管理
+- 固定36色、タグ、検索、BPM・Key・尺フィルター
+- 曲ライブラリからの追加、ドラッグ追加・並べ替え、キーボード代替、Undo／Redo
+- 相手別プリセット、カスタム項目、期限、停止、パスコードを持つ共有リンク
+- 編集・情報開示申請、一時／永続権限、通知・会話用DB基盤
+- A4テンプレート、PDF、JPEG、印刷、Stage View
+- 無料1 ownerバンドのDB制限とStripe課金基盤
+- Resendによるウェルカム・招待・通知メール基盤
 
-- UI文言を日本語主体に変更
-- 初期状態をデモデータなしの空状態に変更
-- 曲だけに番号を振り、MC・SE・転換・衣装チェンジ・暗転・休憩を「曲間」として表示
-- 各曲の直後から、曲または曲間を追加できるタイムラインUI
-- PC・スマートフォンの両方で使える「上へ」「下へ」による並び替え
-- 曲名と尺だけで曲を登録でき、詳細はあとから入力
-- `Song`、`SongVersion`、`SetlistEntry`、ライブ限定の `override` を分離
-- Album / EP / Single / Other と色による簡易リリース管理
-- 担当を特定の楽器に固定せず、カテゴリ＋自由入力で追加
-- 個人練習メモをメインのセトリから分離
-- ホスト画面と、編集UIのない共有資料ページを分離
-- サポート演者用・スタッフ用・一般公開用・担当指定用の表示範囲
-- 用途別の印刷表示
-- セトリ複製に対応できるデータ処理（ホームのセトリ生成処理に複製元を渡せる構造）
+## 技術構成
 
-## 起動方法
+- React / Vite
+- Supabase Auth / Postgres / RLS / Edge Functions
+- dnd-kit
+- jsPDF / html-to-image
+- Vitest / Playwright / ESLint
+- Vercel
+
+## ローカル開発
+
+Node.js 20.19以上（または22.12以上）を使用してください。
 
 ```bash
 npm install
+Copy-Item .env.example .env.local
 npm run dev
 ```
 
-ターミナルに表示されたURL（通常は `http://localhost:5173`）を開いてください。
+`.env.local`へSupabaseの公開URLとpublishable keyを設定します。`service_role`、Google Client Secret、Resend／Stripe Secretをフロントへ置かないでください。
 
-本番向けビルドの確認：
-
-```bash
-npm run build
-npm run preview
+```dotenv
+VITE_SUPABASE_URL=
+VITE_SUPABASE_PUBLISHABLE_KEY=
+VITE_APP_URL=http://localhost:5173
+VITE_APP_NAME=SETPRINT
+VITE_PRO_PRICE_LABEL=
 ```
 
-## 使い方
+検証コマンド：
 
-1. `/signup` でアカウントを作成するか、登録済みアカウントでログインします。
-2. ホームから「新しいセトリを作る」を押します。
-3. セトリのタイトルを押して、日付・会場・持ち時間を設定します。
-4. 「曲を追加」から、曲名と尺だけで曲を作成します。
-5. 各曲の「この後に追加」から、次の曲またはMC・SE・転換などを挿入します。
-6. 曲の「詳細」でKey・BPM・同期・Click・開始方法・担当別メモ・今回だけの変更を設定します。
-7. 共有画面で対象とパスコードを決め、共有リンクを発行します。
-8. 発行された `/share/...` を開き、共有される資料を確認します。リンクは停止・再開・削除できます。
-9. 印刷画面で全員用・サポート演者用・スタッフ用・公開用を切り替えます。
+```bash
+npm run lint
+npm test
+npm run build
+npm run test:e2e
+```
 
-## データ保存
+## Supabase
 
-曲・セトリ・共有モックのデータはブラウザの `localStorage` に、`live-pack-prototype-v2` キーで保存されます。これらのデータはまだ外部DBへ送信されません。
+既存migrationは変更せず、`supabase/migrations`の追加migrationでv2を構成します。
 
-v1の `live-pack-prototype-v1` は読み込まず、v2を空の状態から開始します。設定画面の「すべてリセット」でv2データを初期化できます。
+```bash
+npx supabase link --project-ref <project-ref>
+npx supabase migration list
+npx supabase db push --dry-run
+npx supabase db push
+```
 
-ログイン状態はSupabase Authが管理します。Authユーザーやセッションを`live-pack-prototype-v2`へ独自保存することはありません。
+本番DBに対する`db reset`は行わないでください。`live_pack_private` schemaは既存関数・RLSとの互換性を守るため内部名として維持しています。画面や共有レスポンスには露出しません。
 
-## 共有・認証についての重要な注意
+Edge Functions：
 
-メールアドレス＋パスワードの登録・ログイン・ログアウトはSupabase Authを使用します。共有リンク、パスコード入力、リンク停止、担当別表示は、引き続き体験検証用のフロントエンド・モックです。
+```bash
+npx supabase functions deploy resolve-share-link --no-verify-jwt
+npx supabase functions deploy manage-share-link
+npx supabase functions deploy submit-access-request
+npx supabase functions deploy decide-access-request
+npx supabase functions deploy send-welcome-email
+npx supabase functions deploy send-invitation-email
+npx supabase functions deploy send-notification-email
+npx supabase functions deploy create-checkout-session
+npx supabase functions deploy create-customer-portal
+npx supabase functions deploy stripe-webhook --no-verify-jwt
+```
 
-- 管理画面はSupabase Authへのログインが必要です
-- `/share/...` は将来の公開ページとして認証保護から分離しています
-- URL、パスコード、リンク状態はlocalStorage上のデモデータです
-- 別の端末や別のブラウザへ本当に共有される機能ではありません
-- URLを知る人に対する安全なアクセス制御にはなりません
+## 外部サービス
 
-共有機能を本番化する場合は、サーバー側でのトークン検証、パスコードの安全な照合、リンク期限・監査ログなどが必要です。
+- Google OAuth: Client ID／SecretはSupabase DashboardのGoogle Providerへだけ設定します。詳細は[docs/auth-google-setup.md](docs/auth-google-setup.md)。
+- Resend: SecretはSupabase Edge Function secretsへ設定します。未設定時は送信を安全にskipし、画面操作は失敗させません。詳細は[docs/email-resend-setup.md](docs/email-resend-setup.md)。
+- Stripe: Secret、Price ID、Webhook Secretが揃うまで決済APIを呼ばず「準備中」を返します。金額はコードへ固定していません。詳細は[docs/billing-stripe-setup.md](docs/billing-stripe-setup.md)。
+- Vercel: フロントの公開変数だけを設定します。詳細は[docs/manual-production-setup.md](docs/manual-production-setup.md)。
 
-## Authの手動確認
+## 共有とprivateメモ
 
-1. `npm run dev`で起動し、`/signup`を開きます。
-2. 表示名、受信可能なメールアドレス、パスワードを入力して登録します。
-3. 確認メールの案内が表示された場合は、メール内のリンクを開きます。
-4. `/login`からログインし、画面右上に表示名とメールアドレスが表示されることを確認します。
-5. ページを再読み込みし、ログイン状態と既存の曲・セトリが維持されることを確認します。
-6. 画面右上または設定画面の「ログアウト」を押し、`/login`へ戻ることを確認します。
+共有URLはブラウザーからテーブルを直接読むのではなく、`resolve-share-link`でtoken、期限、停止、ログイン、パスコードを検証してから、許可フィールドだけを再構成します。passcode hash、個人メモ、ホストメール、課金情報、他ライブの情報は返しません。パスコードはsalt付きSHA-256で保存し、平文は作成直後に一度だけ返します。
 
-登録後、Supabaseの`profiles`テーブルに同じユーザーIDの行があり、登録時の表示名と`created_at`が入っていることも確認してください。
+## 料金制限
 
-## 主なデータ構造
+無料ユーザーがownerとして作成できるバンドは1件です。他人のバンドへの参加は数えません。2件目は`account_entitlements.owned_band_limit`をDB triggerで確認するため、UIだけを回避して作成することはできません。Stripe未設定時も1件目と既存データは利用できます。
 
-`src/data/seedData.js` には、将来DBへ移行しやすいように以下を分離して保持しています。
+## データ互換
 
-- `users`: ホスト、メンバー、担当
-- `releases`: Single / EP / Album / Other
-- `songs`: 曲そのもの
-- `songVersions`: よく使う演奏バージョン
-- `lives`: ライブ／セトリ本体
-- `setlistEntries`: ライブ内の曲とライブ限定変更
-- `setlistCues`: 曲と曲の間の進行
-- `notes`: 将来の可視範囲別メモ用
-- `links`: 種類・対象・推奨状態を持つ音源／譜面リンク
-- `shareLinks`: 共有対象・パスコード・有効状態
+旧`live-pack-*` localStorageキーは起動時に一度だけ`setprint-*`へ複製し、移行フラグを保存します。旧キーはバックアップとして残します。既存Supabaseテーブル、project ref、`live_pack_private` schemaは破壊的な改名をしていません。
 
-## 未実装
-
-曲・セトリのSupabase保存、外部共有、Googleログイン、パスワードリセット、決済、AI API、ファイルアップロード、リアルタイム共同編集、PWA、本格PDF生成は含みません。
+設計の全体像は[docs/architecture-v2.md](docs/architecture-v2.md)、セキュリティ境界は[docs/security-model.md](docs/security-model.md)を参照してください。
