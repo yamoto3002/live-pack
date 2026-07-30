@@ -22,6 +22,13 @@ export function toLivePackDataError(error, action = 'データ操作') {
   const isPermissionError = permissionCodes.has(error?.code)
     || /row-level security|permission denied|not allowed/i.test(detail);
 
+  if (/owned band limit reached/i.test(detail)) {
+    return new LivePackDataError(
+      '無料プランで所有できるバンドは1件までです。料金プランの準備が整うまで、他のバンドにはメンバーとして参加できます。',
+      error,
+    );
+  }
+
   if (isPermissionError) {
     return new LivePackDataError(
       `${action}を実行する権限がありません。選択中のバンドと、あなたの権限を確認してください。`,

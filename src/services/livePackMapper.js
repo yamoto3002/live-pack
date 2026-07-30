@@ -26,6 +26,8 @@ export function emptyLivePackData(clientState = {}) {
     notes: [],
     links: [],
     shareLinks: clientState.shareLinks ?? [],
+    tags: [],
+    songTags: [],
   };
 }
 
@@ -41,6 +43,8 @@ export function mapDatabaseData({
   members,
   currentUserId,
   clientState,
+  tags = [],
+  songTags = [],
 }) {
   const mappedVersions = versions.map((version) => ({
     id: version.id,
@@ -130,7 +134,7 @@ export function mapDatabaseData({
       id: release.id,
       title: release.title,
       type: release.release_type ?? 'Other',
-      color: release.color ?? '#46515a',
+      color: release.color_token ?? release.color ?? 'graphite',
       sortOrder: release.sort_order,
       memo: release.memo ?? '',
     })),
@@ -138,7 +142,7 @@ export function mapDatabaseData({
       id: song.id,
       title: song.title,
       releaseId: song.release_id,
-      color: song.color ?? '',
+      color: song.color_token ?? song.color ?? 'graphite',
       memo: song.memo ?? '',
     })),
     songVersions: mappedVersions,
@@ -191,6 +195,14 @@ export function mapDatabaseData({
       recordedAt: link.recorded_at,
     })),
     shareLinks: clientState.shareLinks ?? [],
+    tags: tags.map((tag) => ({
+      id: tag.id,
+      bandId: tag.band_id,
+      name: tag.name,
+      colorToken: tag.color_token,
+      sortOrder: tag.sort_order,
+    })),
+    songTags: songTags.map((row) => ({ songId: row.song_id, tagId: row.tag_id })),
   };
 }
 
@@ -201,6 +213,7 @@ export function toReleaseRow(release, bandId, index = 0) {
     title: release.title.trim(),
     release_type: textOrNull(release.type),
     color: textOrNull(release.color),
+    color_token: textOrNull(release.colorToken || release.color),
     sort_order: release.sortOrder ?? index * 10,
     memo: textOrNull(release.memo),
   };
@@ -213,6 +226,7 @@ export function toSongRow(song, bandId) {
     release_id: song.releaseId || null,
     title: song.title.trim(),
     color: textOrNull(song.color),
+    color_token: textOrNull(song.colorToken || song.color),
     memo: textOrNull(song.memo),
   };
 }
